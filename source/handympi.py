@@ -6,6 +6,7 @@ HAVE_MPI=0
 HAVE_PYPAR=0
 DEBUG=0
 MY_RANK=0
+NUM_NODES=1
 
 try:
     import pypar as pp   # check to see if we have MPI installed                                                         
@@ -13,15 +14,18 @@ try:
     MY_RANK=pp.rank()
     
     from pypar_balancer import PyparWork, PyparBalancer
+
+    NUM_NODES=pp.size()
     
-    if pp.size() > 1:
+    if NUM_NODES > 1:
         HAVE_MPI=1  # we have pypar, and we're running with more than one node
         
     if DEBUG:
-        if HAVE_PYPAR and HAVE_MPI:
-            print "Running full MPI"
-        elif HAVE_PYPAR:
-            print "MPI available, but not enough nodes for master/slave"
+        if MY_RANK==0:
+            if HAVE_PYPAR and HAVE_MPI:
+                print "Running full MPI"
+            elif HAVE_PYPAR:
+                print "MPI available, but not enough nodes for master/slave"
 
     if HAVE_PYPAR and not HAVE_MPI:
         pp.finalize() # not enough nodes to actually run master/slave... shut down MPI now.
@@ -141,7 +145,7 @@ def RunMasterSlave(masterClass, slaveClass, workParams, useMPI=True, finalRun=Tr
 
         return master
 
-def foreach(f, l, useMPI=True, return_=False, debug=False, finalRun=True):
+def foreach(f, l, useMPI=True, return_=True, debug=False, finalRun=True):
     """
     for each element in list 'l' apply the function 'f'.
     You can force serial operation by setting useMPI to 'False'
