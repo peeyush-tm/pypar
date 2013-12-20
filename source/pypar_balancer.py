@@ -96,7 +96,8 @@ class PyparBalancer(object):
         self.work.uplink(self, self.myid, self.numprocs, self.node)
         
         self.numworks = self.work.getNumWorkItems()
-        print "PyparBalancer initialised on proc %d of %d on node %s" %(self.myid, self.numprocs, self.node)
+        if self.debug:
+            print "PyparBalancer initialised on proc %d of %d on node %s" %(self.myid, self.numprocs, self.node)
 
     def master(self):
         numcompleted = 0
@@ -105,14 +106,13 @@ class PyparBalancer(object):
             work = i
             slave= i+1
             pypar.send(work, destination=slave, tag=PYPAR_WORKTAG) 
-            print '[MASTER ]: sent first work "%s" to node %d' %(work, slave)
+            if self.debug: print '[MASTER ]: sent first work "%s" to node %d' %(work, slave)
     
         # dispatch the remaining work slots on dynamic load-balancing policy
         # the quicker to do the job, the more jobs it takes
         for work in range(self.numprocs-1, self.numworks):
             result, status = pypar.receive(source=pypar.any_source, tag=PYPAR_WORKTAG, return_status=True) 
-            print '[MASTER ]: received result from node %d' %(status.source, )
-            #print result
+            if self.debug: print '[MASTER ]: received result from node %d' %(status.source, )
             numcompleted += 1
             pypar.send(work, destination=status.source, tag=PYPAR_WORKTAG)
             if self.debug: print '[MASTER ]: sent work "%s" to node %d' %(work, status.source)
@@ -120,20 +120,19 @@ class PyparBalancer(object):
             self.work.handleWorkResult(result, status)
         
         # all works have been dispatched out
-        print '[MASTER ]: ToDo : %d' %self.numworks
-        print '[MASTER ]: Done : %d' %numcompleted
+        if self.debug: print '[MASTER ]: ToDo : %d' %self.numworks
+        if self.debug: print '[MASTER ]: Done : %d' %numcompleted
         
         # I've still to take into the remaining completions   
         while (numcompleted < self.numworks): 
             result, status = pypar.receive(source=pypar.any_source, tag=PYPAR_WORKTAG, return_status=True) 
-            print '[MASTER ]: received (final) result from node %d' % (status.source, )
-            print result
+            if self.debug: print '[MASTER ]: received (final) result from node %d' % (status.source, )
             numcompleted += 1
-            print '[MASTER ]: %d completed' %numcompleted
+            if self.debug: print '[MASTER ]: %d completed' %numcompleted
             
             self.work.handleWorkResult(result, status)
             
-        print '[MASTER ]: about to terminate slaves'
+        if self.debug: print '[MASTER ]: about to terminate slaves'
     
         # Tell slaves to stop working
         for i in range(1, self.numprocs): 
@@ -146,11 +145,11 @@ class PyparBalancer(object):
         if self.debug: print '[SLAVE %d]: Entering work loop' % (self.myid,)
         while True:
             result, status = pypar.receive(source=0, tag=pypar.any_tag, return_status=True) 
-            print '[SLAVE %d]: received work with tag %d from node %d'\
+            if self.debug: print '[SLAVE %d]: received work with tag %d from node %d'\
                       %(self.myid, status.tag, status.source)
            
             if (status.tag == PYPAR_DIETAG):
-                print '[SLAVE %d]: received termination from node %d' % (self.myid, 0)
+                if self.debug: print '[SLAVE %d]: received termination from node %d' % (self.myid, 0)
                 return
             else:
                 worknum = result
@@ -159,7 +158,7 @@ class PyparBalancer(object):
                 pypar.send(myresult, destination=0)
                 if self.debug: print '[SLAVE %d]: sent result to node %d' % (self.myid, 0)
 
-    def run(self):
+    def run(self, finalRun=True):
         if self.myid == 0:
             self.work.masterBeforeWork()
             self.master()
@@ -168,11 +167,12 @@ class PyparBalancer(object):
             self.work.slaveBeforeWork()
             self.slave()
             self.work.slaveAfterWork()
-        
-        pypar.finalize()
-        if self.myid != 0:
-            sys.exit()
-        # und schluss.
+
+        if finalRun:
+            pypar.finalize()
+            if self.myid != 0:
+                sys.exit()
+                # und schluss.
 
 class PyparDemoWork(PyparWork):
     """Example PyparWork implementation"""
